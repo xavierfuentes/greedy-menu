@@ -12,7 +12,7 @@ export default class GreedyMenu extends PureComponent {
   };
 
   COLLAPSE_TEXT = 'LESS';
-  EXPAND_TEXT = 'MORE';
+  EXPAND_TEXT = 'SUPER MORE AND SOME';
 
   state = {
     isCollapsed: false,
@@ -34,17 +34,21 @@ export default class GreedyMenu extends PureComponent {
 
   getMaxElements = () => {
     const { greedyMenuWrapperNode, ellipsisNode, props: { children }, getElementWidth } = this;
-    const totalWidth = greedyMenuWrapperNode.offsetWidth;
-    const ellipsisWidth = getElementWidth(ellipsisNode);
-    const availableWidth = totalWidth - ellipsisWidth;
 
+    ellipsisNode.innerText = this.EXPAND_TEXT;
+
+    let totalWidth = greedyMenuWrapperNode.offsetWidth;
+    let menuNodes = greedyMenuWrapperNode.childNodes;
+    let ellipsisWidth = getElementWidth(ellipsisNode);
+    let availableWidth = totalWidth - ellipsisWidth;
     let elementsAccumulator = 0;
     let widthAccumulator = 0;
+
     do {
       elementsAccumulator += 1;
-      widthAccumulator += getElementWidth(greedyMenuWrapperNode.childNodes[elementsAccumulator]);
+      widthAccumulator += getElementWidth(menuNodes[elementsAccumulator]);
     } while (
-      widthAccumulator + getElementWidth(greedyMenuWrapperNode.childNodes[elementsAccumulator + 1]) < availableWidth &&
+      widthAccumulator + getElementWidth(menuNodes[elementsAccumulator + 1]) < availableWidth &&
       elementsAccumulator < Children.count(children)
     );
 
@@ -67,6 +71,12 @@ export default class GreedyMenu extends PureComponent {
     return Math.ceil(element.offsetWidth + marginTotal);
   };
 
+  handleEllipsisClick = event => {
+    const { getMaxElements } = this;
+
+    this.setState(prevState => ({ visibleElements: getMaxElements(), isCollapsed: !prevState.isCollapsed }));
+  };
+
   /**
    * Decide whether it should render the ellipsis or not
    */
@@ -77,15 +87,17 @@ export default class GreedyMenu extends PureComponent {
   };
 
   renderChildren = () => {
-    return Children.map(this.props.children, (child, index) => {
+    const { visibleElements } = this.state;
+    const { children } = this.props;
+
+    return Children.map(children, (child, index) => {
       return cloneElement(child, {
         ...child.props,
         className: cx(
           'greedy-menu__child',
-          { 'greedy-menu__child--hidden': index + 1 > this.state.visibleElements },
+          { 'greedy-menu__child--hidden': index + 1 > visibleElements },
           child.props.className
         ),
-        style: { ...child.props.style },
       });
     });
   };
@@ -101,7 +113,7 @@ export default class GreedyMenu extends PureComponent {
           this.ellipsisNode = button;
         }}
         key="ellipsis"
-        onClick={this.toggleEllipsis}
+        onClick={this.handleEllipsisClick}
       >
         {isCollapsed ? EXPAND_TEXT : COLLAPSE_TEXT}
       </button>
