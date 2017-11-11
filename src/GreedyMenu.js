@@ -4,15 +4,30 @@ import cx from 'classnames';
 
 import './GreedyMenu.css';
 
+export function throttle(callback, wait, context = this) {
+  let timeout = null;
+  let callbackArgs = null;
+
+  const later = () => {
+    callback.apply(context, callbackArgs);
+    timeout = null;
+  };
+
+  return function() {
+    if (!timeout) {
+      callbackArgs = arguments;
+      timeout = setTimeout(later, wait);
+    }
+  };
+}
+
 export default class GreedyMenu extends PureComponent {
   static propTypes = {
-    className: PropTypes.string,
-    style: PropTypes.shape({}),
     children: PropTypes.oneOfType([PropTypes.element, PropTypes.arrayOf(PropTypes.element)]),
   };
 
   COLLAPSE_TEXT = 'LESS';
-  EXPAND_TEXT = 'SUPER MORE AND SOME';
+  EXPAND_TEXT = 'MORE';
 
   state = {
     isCollapsed: false,
@@ -20,16 +35,15 @@ export default class GreedyMenu extends PureComponent {
   };
 
   onLoad = () => {
-    const { getMaxElements, shouldCollapse } = this;
-
-    shouldCollapse() && this.setState({ visibleElements: getMaxElements(), isCollapsed: true });
-  };
-
-  shouldCollapse = () => {
     const { getMaxElements, props: { children } } = this;
     const maxElements = getMaxElements();
 
-    return maxElements !== Children.count(children);
+    maxElements !== Children.count(children) && this.setState({ visibleElements: maxElements, isCollapsed: true });
+  };
+
+  onResize = () => {
+    const { getMaxElements, state: { isCollapsed } } = this;
+    isCollapsed && this.setState({ visibleElements: getMaxElements() });
   };
 
   getMaxElements = () => {
@@ -43,14 +57,13 @@ export default class GreedyMenu extends PureComponent {
     let availableWidth = totalWidth - ellipsisWidth;
     let elementsAccumulator = 0;
     let widthAccumulator = 0;
+    let currentElementWidth = 0;
 
     do {
+      currentElementWidth = getElementWidth(menuNodes[elementsAccumulator]);
+      widthAccumulator += currentElementWidth;
       elementsAccumulator += 1;
-      widthAccumulator += getElementWidth(menuNodes[elementsAccumulator]);
-    } while (
-      widthAccumulator + getElementWidth(menuNodes[elementsAccumulator + 1]) < availableWidth &&
-      elementsAccumulator < Children.count(children)
-    );
+    } while (widthAccumulator + currentElementWidth < availableWidth && elementsAccumulator < Children.count(children));
 
     return elementsAccumulator;
   };
@@ -72,17 +85,18 @@ export default class GreedyMenu extends PureComponent {
   };
 
   handleEllipsisClick = event => {
-    const { getMaxElements } = this;
+    const { getMaxElements, props: { children } } = this;
 
-    this.setState(prevState => ({ visibleElements: getMaxElements(), isCollapsed: !prevState.isCollapsed }));
+    this.setState(prevState => ({
+      visibleElements: prevState.isCollapsed ? Children.count(children) : getMaxElements(),
+      isCollapsed: !prevState.isCollapsed,
+    }));
   };
 
   /**
    * Decide whether it should render the ellipsis or not
    */
   renderContent = () => {
-    // const { isCollapsed } = this.state;
-    // return isCollapsed ? this.renderChildren().concat(this.renderEllipsis()) : this.renderChildren();
     return this.renderChildren().concat(this.renderEllipsis());
   };
 
@@ -103,7 +117,6 @@ export default class GreedyMenu extends PureComponent {
   };
 
   renderEllipsis = (text = 'Ellipsis') => {
-    // const { isCollapsed } = this.state;
     const { COLLAPSE_TEXT, EXPAND_TEXT, state: { isCollapsed } } = this;
 
     return (
@@ -122,6 +135,7 @@ export default class GreedyMenu extends PureComponent {
 
   componentDidMount() {
     window.addEventListener('load', this.onLoad);
+    window.addEventListener('resize', throttle(this.onResize, 200));
   }
 
   componentWillMount() {
@@ -130,6 +144,7 @@ export default class GreedyMenu extends PureComponent {
 
   componentWillUnmount() {
     window.removeEventListener('load', this.onLoad);
+    window.removeEventListener('resize', throttle(this.onResize, 200));
   }
 
   render() {
