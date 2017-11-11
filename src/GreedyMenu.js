@@ -2,6 +2,8 @@ import React, { PureComponent, Children, cloneElement } from 'react';
 import PropTypes from 'prop-types';
 import cx from 'classnames';
 
+import './GreedyMenu.css';
+
 export default class GreedyMenu extends PureComponent {
   static propTypes = {
     className: PropTypes.string,
@@ -13,12 +15,24 @@ export default class GreedyMenu extends PureComponent {
   EXPAND_TEXT = 'MORE';
 
   state = {
-    isExpanded: true,
+    isCollapsed: false,
     visibleElements: 0,
-    elementsList: [],
   };
 
-  checkSizes = () => {
+  onLoad = () => {
+    const { getMaxElements, shouldCollapse } = this;
+
+    shouldCollapse() && this.setState({ visibleElements: getMaxElements(), isCollapsed: true });
+  };
+
+  shouldCollapse = () => {
+    const { getMaxElements, props: { children } } = this;
+    const maxElements = getMaxElements();
+
+    return maxElements !== Children.count(children);
+  };
+
+  getMaxElements = () => {
     const { greedyMenuWrapperNode, ellipsisNode, props: { children }, getElementWidth } = this;
     const totalWidth = greedyMenuWrapperNode.offsetWidth;
     const ellipsisWidth = getElementWidth(ellipsisNode);
@@ -57,33 +71,45 @@ export default class GreedyMenu extends PureComponent {
    * Decide whether it should render the ellipsis or not
    */
   renderContent = () => {
+    // const { isCollapsed } = this.state;
+    // return isCollapsed ? this.renderChildren().concat(this.renderEllipsis()) : this.renderChildren();
     return this.renderChildren().concat(this.renderEllipsis());
   };
 
-  renderChildren = () =>
-    Children.map(this.props.children, child =>
-      cloneElement(child, {
+  renderChildren = () => {
+    return Children.map(this.props.children, (child, index) => {
+      return cloneElement(child, {
         ...child.props,
-        className: cx('greedy-menu__child', child.props.className),
+        className: cx(
+          'greedy-menu__child',
+          { 'greedy-menu__child--hidden': index + 1 > this.state.visibleElements },
+          child.props.className
+        ),
         style: { ...child.props.style },
-      })
-    );
+      });
+    });
+  };
 
-  renderEllipsis = (text = 'Ellipsis') => (
-    <button
-      className="greedy-menu__ellipsis"
-      ref={button => {
-        this.ellipsisNode = button;
-      }}
-      key="ellipsis"
-      onClick={this.toggleEllipsis}
-    >
-      {text}
-    </button>
-  );
+  renderEllipsis = (text = 'Ellipsis') => {
+    // const { isCollapsed } = this.state;
+    const { COLLAPSE_TEXT, EXPAND_TEXT, state: { isCollapsed } } = this;
+
+    return (
+      <button
+        className="greedy-menu__ellipsis"
+        ref={button => {
+          this.ellipsisNode = button;
+        }}
+        key="ellipsis"
+        onClick={this.toggleEllipsis}
+      >
+        {isCollapsed ? EXPAND_TEXT : COLLAPSE_TEXT}
+      </button>
+    );
+  };
 
   componentDidMount() {
-    window.addEventListener('load', this.checkSizes);
+    window.addEventListener('load', this.onLoad);
   }
 
   componentWillMount() {
@@ -91,20 +117,19 @@ export default class GreedyMenu extends PureComponent {
   }
 
   componentWillUnmount() {
-    window.removeEventListener('load', this.checkSizes);
+    window.removeEventListener('load', this.onLoad);
   }
 
   render() {
-    const { className, style, ...rest } = this.props;
-    const GM_WRAPPER_BASE_STYLE = { width: '100%', height: '100%' };
+    const { className, ...rest } = this.props;
+    const { isCollapsed } = this.state;
 
     return (
       <div
         ref={wrapper => {
           this.greedyMenuWrapperNode = wrapper;
         }}
-        className={cx('greedy-menu', className)}
-        style={{ ...style, ...GM_WRAPPER_BASE_STYLE }}
+        className={cx('greedy-menu', { 'greedy-menu--collapsed': isCollapsed }, className)}
         {...rest}
       >
         {this.renderContent()}

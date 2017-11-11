@@ -1,0 +1,13 @@
+.greedy-menu {
+  width: 100%;
+  height: 100%;
+}
+
+.greedy-menu--collapsed {
+  overflow-x: hidden;
+  white-space: nowrap;
+}
+
+.greedy-menu__child--hidden {
+  display: none;
+}
