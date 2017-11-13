@@ -2,8 +2,6 @@ import React, { PureComponent, Children, cloneElement } from 'react';
 import PropTypes from 'prop-types';
 import cx from 'classnames';
 
-import './GreedyMenu.css';
-
 export function throttle(callback, wait, context = this) {
   let timeout = null;
   let callbackArgs = null;
@@ -58,12 +56,18 @@ export default class GreedyMenu extends PureComponent {
     let elementsAccumulator = 0;
     let widthAccumulator = 0;
     let currentElementWidth = 0;
+    let nextElementWidth = 0;
 
     do {
       currentElementWidth = getElementWidth(menuNodes[elementsAccumulator]);
+      nextElementWidth = getElementWidth(menuNodes[elementsAccumulator + 1]);
       widthAccumulator += currentElementWidth;
       elementsAccumulator += 1;
-    } while (widthAccumulator + currentElementWidth < availableWidth && elementsAccumulator < Children.count(children));
+    } while (
+      widthAccumulator + currentElementWidth < availableWidth &&
+      widthAccumulator + nextElementWidth < availableWidth &&
+      elementsAccumulator < Children.count(children)
+    );
 
     return elementsAccumulator;
   };
@@ -87,10 +91,14 @@ export default class GreedyMenu extends PureComponent {
   handleEllipsisClick = event => {
     const { getMaxElements, props: { children } } = this;
 
+    event.target.hidden = true;
+
     this.setState(prevState => ({
       visibleElements: prevState.isCollapsed ? Children.count(children) : getMaxElements(),
       isCollapsed: !prevState.isCollapsed,
     }));
+
+    event.target.hidden = false;
   };
 
   /**
@@ -103,15 +111,13 @@ export default class GreedyMenu extends PureComponent {
   renderChildren = () => {
     const { visibleElements } = this.state;
     const { children } = this.props;
+    const isHidden = i => i + 1 > visibleElements;
 
     return Children.map(children, (child, index) => {
+      const newStyle = isHidden(index) ? { display: 'none' } : {};
       return cloneElement(child, {
-        ...child.props,
-        className: cx(
-          'greedy-menu__child',
-          { 'greedy-menu__child--hidden': index + 1 > visibleElements },
-          child.props.className
-        ),
+        className: cx('greedy-menu__child', { 'greedy-menu__child--hidden': isHidden(index) }, child.props.className),
+        style: newStyle,
       });
     });
   };
@@ -135,7 +141,7 @@ export default class GreedyMenu extends PureComponent {
 
   componentDidMount() {
     window.addEventListener('load', this.onLoad);
-    window.addEventListener('resize', throttle(this.onResize, 200));
+    window.addEventListener('resize', throttle(this.onResize, 100));
   }
 
   componentWillMount() {
@@ -144,11 +150,11 @@ export default class GreedyMenu extends PureComponent {
 
   componentWillUnmount() {
     window.removeEventListener('load', this.onLoad);
-    window.removeEventListener('resize', throttle(this.onResize, 200));
+    window.removeEventListener('resize', throttle(this.onResize, 100));
   }
 
   render() {
-    const { className, ...rest } = this.props;
+    const { className, style, ...rest } = this.props;
     const { isCollapsed } = this.state;
 
     return (
@@ -157,6 +163,7 @@ export default class GreedyMenu extends PureComponent {
           this.greedyMenuWrapperNode = wrapper;
         }}
         className={cx('greedy-menu', { 'greedy-menu--collapsed': isCollapsed }, className)}
+        style={{ width: '100%', height: '100%' }}
         {...rest}
       >
         {this.renderContent()}
