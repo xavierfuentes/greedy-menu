@@ -8,9 +8,9 @@ const appStyle = {
 };
 
 const menuStyle = {
-  margin: '0 auto',
-  // width: '1000px',
-  // maxWidth: '1000px',
+  margin: '10px auto',
+  width: '1000px',
+  maxWidth: '1000px',
   border: '1px dotted blue',
 };
 

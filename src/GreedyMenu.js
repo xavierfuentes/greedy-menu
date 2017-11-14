@@ -29,14 +29,19 @@ export default class GreedyMenu extends PureComponent {
 
   state = {
     isCollapsed: false,
+    isCollapsible: true,
     visibleElements: 0,
   };
 
-  onLoad = () => {
+  check = () => {
     const { getMaxElements, props: { children } } = this;
     const maxElements = getMaxElements();
+    const state =
+      maxElements < Children.count(children)
+        ? { visibleElements: maxElements, isCollapsed: true, isCollapsible: true }
+        : { visibleElements: Children.count(children), isCollapsed: false, isCollapsible: false };
 
-    maxElements !== Children.count(children) && this.setState({ visibleElements: maxElements, isCollapsed: true });
+    this.setState(state);
   };
 
   onResize = () => {
@@ -45,29 +50,38 @@ export default class GreedyMenu extends PureComponent {
   };
 
   getMaxElements = () => {
-    const { greedyMenuWrapperNode, ellipsisNode, props: { children }, getElementWidth } = this;
+    const { greedyMenuWrapperNode, ellipsisNode, getElementWidth } = this;
+    const elements = [];
 
     ellipsisNode.innerText = this.EXPAND_TEXT;
 
     let totalWidth = greedyMenuWrapperNode.offsetWidth;
-    let menuNodes = greedyMenuWrapperNode.childNodes;
     let ellipsisWidth = getElementWidth(ellipsisNode);
-    let availableWidth = totalWidth - ellipsisWidth;
+    let menuNodes = greedyMenuWrapperNode.childNodes;
     let elementsAccumulator = 0;
     let widthAccumulator = 0;
     let currentElementWidth = 0;
     let nextElementWidth = 0;
+    let currentElement = null;
 
     do {
-      currentElementWidth = getElementWidth(menuNodes[elementsAccumulator]);
+      currentElement = menuNodes[elementsAccumulator];
+      currentElementWidth = getElementWidth(currentElement);
       nextElementWidth = getElementWidth(menuNodes[elementsAccumulator + 1]);
+      elements.push({
+        node: currentElement,
+        width: currentElementWidth,
+      });
       widthAccumulator += currentElementWidth;
       elementsAccumulator += 1;
-    } while (
-      widthAccumulator + currentElementWidth < availableWidth &&
-      widthAccumulator + nextElementWidth < availableWidth &&
-      elementsAccumulator < Children.count(children)
-    );
+    } while (currentElement !== ellipsisNode && widthAccumulator + nextElementWidth < totalWidth);
+
+    if (elementsAccumulator < Children.count(this.props.children)) {
+      do {
+        widthAccumulator -= elements[elementsAccumulator - 1].width;
+        elementsAccumulator -= 1;
+      } while (widthAccumulator + ellipsisWidth > totalWidth);
+    }
 
     return elementsAccumulator;
   };
@@ -123,7 +137,8 @@ export default class GreedyMenu extends PureComponent {
   };
 
   renderEllipsis = (text = 'Ellipsis') => {
-    const { COLLAPSE_TEXT, EXPAND_TEXT, state: { isCollapsed } } = this;
+    const { COLLAPSE_TEXT, EXPAND_TEXT, state: { isCollapsed, isCollapsible } } = this;
+    const ellipsisStyle = isCollapsible ? {} : { display: 'none' };
 
     return (
       <button
@@ -133,6 +148,7 @@ export default class GreedyMenu extends PureComponent {
         }}
         key="ellipsis"
         onClick={this.handleEllipsisClick}
+        style={ellipsisStyle}
       >
         {isCollapsed ? EXPAND_TEXT : COLLAPSE_TEXT}
       </button>
@@ -140,7 +156,7 @@ export default class GreedyMenu extends PureComponent {
   };
 
   componentDidMount() {
-    window.addEventListener('load', this.onLoad);
+    window.addEventListener('load', this.check);
     window.addEventListener('resize', throttle(this.onResize, 100));
   }
 
@@ -149,7 +165,7 @@ export default class GreedyMenu extends PureComponent {
   }
 
   componentWillUnmount() {
-    window.removeEventListener('load', this.onLoad);
+    window.removeEventListener('load', this.check);
     window.removeEventListener('resize', throttle(this.onResize, 100));
   }
 
@@ -163,7 +179,7 @@ export default class GreedyMenu extends PureComponent {
           this.greedyMenuWrapperNode = wrapper;
         }}
         className={cx('greedy-menu', { 'greedy-menu--collapsed': isCollapsed }, className)}
-        style={{ width: '100%', height: '100%' }}
+        style={{ ...style, width: '100%', height: '100%' }}
         {...rest}
       >
         {this.renderContent()}
